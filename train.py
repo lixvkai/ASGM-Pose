@@ -1,12 +1,8 @@
 import os
 import numpy as np
 import argparse
-import errno
-import math
-import pickle
 import datetime
 import tensorboardX
-import torch.distributed
 from tqdm import tqdm
 import time
 import copy
@@ -15,7 +11,6 @@ import prettytable
 import yaml
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
@@ -37,17 +32,13 @@ def parse_args():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--config", type=str, default="configs/pretrain.yaml", help="Path to the config file.")
+    parser.add_argument("--config", type=str, required=True, help="Path to the config file.")
 
     parser.add_argument('-c', '--checkpoint', default='checkpoint', type=str, metavar='PATH', help='checkpoint directory')
-
-    parser.add_argument('-p', '--pretrained', default='checkpoint', type=str, metavar='PATH', help='pretrained checkpoint directory')
 
     parser.add_argument('-r', '--resume', default='', type=str, metavar='FILENAME', help='checkpoint to resume (file name)')
 
     parser.add_argument('-e', '--evaluate', default='', type=str, metavar='FILENAME', help='checkpoint to evaluate (file name)')
-
-    parser.add_argument('-ms', '--selection', default='latest_epoch.bin', type=str, metavar='FILENAME', help='checkpoint to finetune (file name)')
 
     parser.add_argument('-sd', '--seed', default=0, type=int, help='random seed')
     opts = parser.parse_args()
@@ -94,8 +85,6 @@ def evaluate(args, model_pos, test_loader, datareader):
                 predicted_3d_pos[:, :, 0, :] = 0
             else:
                 batch_gt[:, 0, 0, 2] = 0
-            if args.gt_2d:
-                predicted_3d_pos[..., :2] = batch_input[..., :2]
             results_all.append(predicted_3d_pos.cpu().numpy())
 
     log.info(len(results_all))
@@ -320,35 +309,20 @@ def train_with_config(args, opts):
         model_backbone = nn.DataParallel(model_backbone)
         model_backbone = model_backbone.cuda()
 
-    if args.finetune:
-        if opts.resume or opts.evaluate:
-            chk_filename = opts.evaluate if opts.evaluate else opts.resume
-            log.info(f'Loading checkpoint {chk_filename}')
-            checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)
-            model_backbone.load_state_dict(checkpoint['model_pos'], strict=True)
-            model_pos = model_backbone
-        else:
-            chk_filename = os.path.join(opts.pretrained, opts.selection)
-            log.info(f'Loading checkpoint {chk_filename}')
-            checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)
-            model_backbone.load_state_dict(checkpoint['model_pos'], strict=True)
-            model_pos = model_backbone
-    else:
-        chk_filename = os.path.join(opts.checkpoint, "latest_epoch.bin")
-        if os.path.exists(chk_filename):
-            opts.resume = chk_filename
-        if opts.resume or opts.evaluate:
-            chk_filename = opts.evaluate if opts.evaluate else opts.resume
-            log.info(f'Loading checkpoint {chk_filename}')
-            import torch.serialization
-            torch.serialization.add_safe_globals([numpy._core.multiarray.scalar])
-            checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage, weights_only=False)
-            if args.backbone == 'MotionAGFormer':
-                model_backbone.load_state_dict(checkpoint['model'], strict=True)
-            else:
-                model_backbone.load_state_dict(checkpoint['model_pos'], strict=True)
-        model_pos = model_backbone
-
+    chk_filename = os.path.join(opts.checkpoint, 'latest_epoch.bin')
+    if os.path.exists(chk_filename) and not opts.evaluate:
+        opts.resume = chk_filename
+    if opts.resume or opts.evaluate:
+        chk_filename = opts.evaluate if opts.evaluate else opts.resume
+        log.info(f'Loading checkpoint {chk_filename}')
+        torch.serialization.add_safe_globals([numpy._core.multiarray.scalar])
+        checkpoint = torch.load(
+            chk_filename,
+            map_location=lambda storage, location: storage,
+            weights_only=False,
+        )
+        model_backbone.load_state_dict(checkpoint['model_pos'], strict=True)
+    model_pos = model_backbone
 
     if not opts.evaluate:
         lr = args.learning_rate
@@ -384,25 +358,26 @@ def train_with_config(args, opts):
             train_epoch(args, model_pos, train_loader_3d, losses, optimizer, has_3d=True, has_gt=True)
             elapsed = (time.time() - start_time) / 60
 
-            if args.no_eval:
-                log.info('[%d] time %.2f lr %f 3d_train %f' % (
-                    epoch + 1, elapsed, lr, losses['3d_pos'].avg))
-            else:
-                e1, e2, results_all = evaluate(args, model_pos, test_loader, datareader)
-                log.info('[%d] time %.2f lr %f 3d_train %f e1 %f e2 %f' % (
-                    epoch + 1, elapsed, lr, losses['3d_pos'].avg, e1, e2))
-                log.info(f'Remaining training time: {datetime.timedelta(seconds=(time.time() - start_time) * (args.epochs - epoch))}')
-                train_writer.add_scalar('Error P1', e1, epoch + 1)
-                train_writer.add_scalar('Error P2', e2, epoch + 1)
-                train_writer.add_scalar('loss_3d_pos', losses['3d_pos'].avg, epoch + 1)
-                train_writer.add_scalar('loss_2d_proj', losses['2d_proj'].avg, epoch + 1)
-                train_writer.add_scalar('loss_3d_scale', losses['3d_scale'].avg, epoch + 1)
-                train_writer.add_scalar('loss_3d_velocity', losses['3d_velocity'].avg, epoch + 1)
-                train_writer.add_scalar('loss_lv', losses['lv'].avg, epoch + 1)
-                train_writer.add_scalar('loss_lg', losses['lg'].avg, epoch + 1)
-                train_writer.add_scalar('loss_a', losses['angle'].avg, epoch + 1)
-                train_writer.add_scalar('loss_av', losses['angle_velocity'].avg, epoch + 1)
-                train_writer.add_scalar('loss_total', losses['total'].avg, epoch + 1)
+            e1, e2, results_all = evaluate(
+                args, model_pos, test_loader, datareader
+            )
+            log.info('[%d] time %.2f lr %f 3d_train %f e1 %f e2 %f' % (
+                epoch + 1, elapsed, lr, losses['3d_pos'].avg, e1, e2))
+            log.info(
+                f'Remaining training time: '
+                f'{datetime.timedelta(seconds=(time.time() - start_time) * (args.epochs - epoch))}'
+            )
+            train_writer.add_scalar('Error P1', e1, epoch + 1)
+            train_writer.add_scalar('Error P2', e2, epoch + 1)
+            train_writer.add_scalar('loss_3d_pos', losses['3d_pos'].avg, epoch + 1)
+            train_writer.add_scalar('loss_2d_proj', losses['2d_proj'].avg, epoch + 1)
+            train_writer.add_scalar('loss_3d_scale', losses['3d_scale'].avg, epoch + 1)
+            train_writer.add_scalar('loss_3d_velocity', losses['3d_velocity'].avg, epoch + 1)
+            train_writer.add_scalar('loss_lv', losses['lv'].avg, epoch + 1)
+            train_writer.add_scalar('loss_lg', losses['lg'].avg, epoch + 1)
+            train_writer.add_scalar('loss_a', losses['angle'].avg, epoch + 1)
+            train_writer.add_scalar('loss_av', losses['angle_velocity'].avg, epoch + 1)
+            train_writer.add_scalar('loss_total', losses['total'].avg, epoch + 1)
 
             lr *= lr_decay
             for param_group in optimizer.param_groups:

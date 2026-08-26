@@ -1,10 +1,7 @@
-no_eval: False
-finetune: False
 
 epochs: 120
 checkpoint_frequency: 30
 batch_size: 4
-dropout: 0.0
 learning_rate: 0.0002
 weight_decay: 0.01
 lr_decay: 0.99
@@ -14,7 +11,6 @@ maxlen: 243
 dim_feat: 128
 mlp_ratio: 2
 depth: 20
-att_fuse: True
 
 token_num: 81
 layer_index: 15
@@ -28,7 +24,6 @@ rootrel: True
 sample_stride: 1
 num_joints: 17
 no_conf: True
-gt_2d: False
 
 lambda_3d_velocity: 20.0
 lambda_scale: 0.5
@@ -42,5 +37,4 @@ lambda_diff: 0.5
 lambda_spatial_rank: 1.0
 lambda_temporal_rank: 1.0
 
-synthetic: False
 flip: True

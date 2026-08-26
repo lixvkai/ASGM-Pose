@@ -9,7 +9,7 @@ Create a Python environment and install a PyTorch build compatible with your CUD
 ```bash
 conda create -n asgm-pose python=3.10
 conda activate asgm-pose
-# Install PyTorch and torchvision following https://pytorch.org/get-started/locally/
+# Install PyTorch following https://pytorch.org/get-started/locally/
 pip install -r requirements.txt
 ```
 
