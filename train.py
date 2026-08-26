@@ -27,7 +27,6 @@ from lib.utils.tools import *
 from lib.utils.learning import *
 from lib.utils.utils_data import flip_data
 from lib.data.dataset_motion_3d import MotionDataset3D
-from lib.data.augmentation import Augmenter2D
 from lib.data.datareader_h36m import DataReaderH36M
 from lib.model.loss import *
 import logger
@@ -193,8 +192,6 @@ def train_epoch(args, model_pos, train_loader, losses, optimizer, has_3d, has_gt
                 batch_gt = batch_gt - batch_gt[:, :, 0:1, :]
             else:
                 batch_gt[:, :, :, 2] = batch_gt[:, :, :, 2] - batch_gt[:, 0:1, 0:1, 2]
-            if args.mask or args.noise:
-                batch_input = args.aug.augment2D(batch_input, noise=(args.noise and has_gt), mask=args.mask)
 
         predicted_3d_pos = model_pos(batch_input)
         optimizer.zero_grad()
@@ -352,8 +349,6 @@ def train_with_config(args, opts):
                 model_backbone.load_state_dict(checkpoint['model_pos'], strict=True)
         model_pos = model_backbone
 
-    if args.partial_train:
-        model_pos = partial_train_layers(model_pos, args.partial_train)
 
     if not opts.evaluate:
         lr = args.learning_rate
@@ -371,9 +366,6 @@ def train_with_config(args, opts):
             if 'min_loss' in checkpoint and checkpoint['min_loss'] is not None:
                 min_loss = checkpoint['min_loss']
 
-        args.mask = (args.mask_ratio > 0 and args.mask_T_ratio > 0)
-        if args.mask or args.noise:
-            args.aug = Augmenter2D(args)
 
         for epoch in range(st, args.epochs):
             log.info(f'Training epoch {epoch}.')

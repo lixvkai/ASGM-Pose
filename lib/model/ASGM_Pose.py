@@ -1,36 +1,14 @@
 import math
-import logging
-from functools import partial
-from collections import OrderedDict
-from einops import rearrange, repeat
-import numpy as np
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-import time
-
-from math import sqrt
 import os
 import sys
 
-
-current_directory = os.path.dirname(__file__) + '/../' + '../'
-sys.path.append(current_directory)
-from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
-from timm.models.helpers import load_pretrained
-from lib.model.drop import DropPath
-from timm.models.registry import register_model
-import torch.nn.functional as F
-from functools import partial
-import torch.fft
-
-from timm.models.registry import register_model
-from timm.models.vision_transformer import _cfg
-import math
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from einops import rearrange, repeat
 
+from lib.model.drop import DropPath
 from lib.model.mambablocks import BiSTSSMBlock
 
 

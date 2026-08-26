@@ -69,16 +69,6 @@ def load_pretrained_weights(model, checkpoint):
     return model
 
 
-def partial_train_layers(model, partial_list):
-    """Train partial layers of a given model."""
-    for name, p in model.named_parameters():
-        p.requires_grad = False
-        for trainable in partial_list:
-            if trainable in name:
-                p.requires_grad = True
-                break
-    return model
-
 
 def load_backbone(args):
     if not hasattr(args, "backbone"):

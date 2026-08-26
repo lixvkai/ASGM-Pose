@@ -1,6 +1,5 @@
 no_eval: False
 finetune: False
-partial_train: null
 
 epochs: 120
 checkpoint_frequency: 30
@@ -45,6 +44,3 @@ lambda_temporal_rank: 1.0
 
 synthetic: False
 flip: True
-mask_ratio: 0.
-mask_T_ratio: 0.
-noise: False

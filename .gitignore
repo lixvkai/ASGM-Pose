@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+/data/
+checkpoint/
+checkpoints/
+outputs/
+runs/
+*.bin
+*.pt
+*.pth
+*.pth.tar
+*.npy
+*.npz

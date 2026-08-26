@@ -11,12 +11,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from einops import rearrange, repeat
-from timm.models.layers import DropPath, trunc_normal_
-from fvcore.nn import FlopCountAnalysis, flop_count_str, flop_count, parameter_count
-from torchvision.models import VisionTransformer
+from .drop import DropPath
 
 
-DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
+DropPath.__repr__ = lambda self: f"DropPath({self.drop_prob})"
 
 
 torch.backends.cudnn.enabled = True
