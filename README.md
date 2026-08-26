@@ -32,7 +32,15 @@ After preparation, `data/motion3d/MB3D_f243s81/` must contain `h36m_sh_conf_cam_
 
 ## Pretrained checkpoints
 
-Download links for the ASGM-Pose S/B/L checkpoints will be provided in a later release. Once available, place each checkpoint at any local path; the evaluation command accepts the checkpoint path explicitly.
+Download the Human3.6M checkpoint that matches the selected configuration:
+
+| Model | Download |
+| --- | --- |
+| ASGM-Pose-S | [Google Drive](https://drive.google.com/file/d/1P7mAYdCm1euVwCfIALQzL5Khtzanuaml/view?usp=drive_link) |
+| ASGM-Pose-B | [Google Drive](https://drive.google.com/file/d/1hqlb0nukVdj8ZOd0gzMxuKrxU0UA2oR5/view?usp=drive_link) |
+| ASGM-Pose-L | [Google Drive](https://drive.google.com/file/d/1pIsr9_0Bxjc_2HscaTEzdyNcYqdMSdhd/view?usp=drive_link) |
+
+Place the downloaded checkpoint at any local path; the evaluation command accepts the checkpoint path explicitly.
 
 ## Training
 
