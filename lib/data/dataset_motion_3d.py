@@ -12,7 +12,7 @@ from lib.utils.utils_data import flip_data
 
 
 class MotionDataset(Dataset):
-    def __init__(self, args, subset_list, data_split):  # data_split: train/test
+    def __init__(self, args, subset_list, data_split):
         np.random.seed(0)
         self.data_root = args.data_root
         self.subset_list = subset_list
@@ -43,7 +43,7 @@ class MotionDataset3D(MotionDataset):
 
     def __getitem__(self, index):
         'Generates one sample of data'
-        # Select sample
+
         file_path = self.file_list[index]
         motion_file = read_pkl(file_path)
         motion_3d = motion_file["data_label"]
@@ -52,10 +52,10 @@ class MotionDataset3D(MotionDataset):
                 motion_3d = self.aug.augment3D(motion_3d)
                 motion_2d = np.zeros(motion_3d.shape, dtype=np.float32)
                 motion_2d[:, :, :2] = motion_3d[:, :, :2]
-                motion_2d[:, :, 2] = 1  # No 2D detection, use GT xy and c=1.
-            elif motion_file["data_input"] is not None:  # Have 2D detection
+                motion_2d[:, :, 2] = 1
+            elif motion_file["data_input"] is not None:
                 motion_2d = motion_file["data_input"]
-                if self.flip and random.random() > 0.5:  # Training augmentation - random flipping
+                if self.flip and random.random() > 0.5:
                     motion_2d = flip_data(motion_2d)
                     motion_3d = flip_data(motion_3d)
             else:

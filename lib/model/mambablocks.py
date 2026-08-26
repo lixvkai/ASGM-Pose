@@ -15,15 +15,15 @@ from timm.models.layers import DropPath, trunc_normal_
 from fvcore.nn import FlopCountAnalysis, flop_count_str, flop_count, parameter_count
 from torchvision.models import VisionTransformer
 
-# 重写 DropPath 的 __repr__ 方法，便于调试时输出更清晰的信息
+
 DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
 
-# 启用 CUDA 优化以提升性能
+
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.deterministic = True
 
-# 尝试导入自定义的 Mamba 模块，用于选择性扫描和跨扫描/合并操作
+
 try:
     from .csm_triton import CrossScanTriton, CrossMergeTriton, CrossScanTriton1b1, getCSM
     from .csm_triton import CrossScanTritonF, CrossMergeTritonF, CrossScanTriton1b1F
@@ -39,30 +39,30 @@ except:
     from csms6s import SelectiveScanMamba, SelectiveScanCore, SelectiveScanOflex
     from csms6s import flops_selective_scan_fn, flops_selective_scan_ref, selective_scan_flop_jit
 
-# =====================================================
-# Linear2d: 自定义线性层，模拟 2D 卷积以兼容卷积和线性权重加载
+
+
 class Linear2d(nn.Linear):
     def forward(self, x: torch.Tensor):
-        # 将线性操作作为 1x1 卷积应用
-        # 输入形状: (B, C, H, W) -> 输出形状: (B, C', H, W)
+
+
         return F.conv2d(x, self.weight[:, :, None, None], self.bias)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs):
-        # 在加载状态字典时，重塑权重以匹配 Linear2d 的形状
+
         state_dict[prefix + "weight"] = state_dict[prefix + "weight"].view(self.weight.shape)
         return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys, error_msgs)
 
-# LayerNorm2d: 为 2D 输入 (B, C, H, W) 适配的层归一化
+
 class LayerNorm2d(nn.LayerNorm):
     def forward(self, x: torch.Tensor):
-        # 输入: (B, C, H, W) -> 转换为 (B, H, W, C) 以应用 LayerNorm
+
         x = x.permute(0, 2, 3, 1)
         x = nn.functional.layer_norm(x, self.normalized_shape, self.weight, self.bias, self.eps)
-        # 转换回 (B, C, H, W)
+
         x = x.permute(0, 3, 1, 2)
         return x
 
-# PatchMerging2D: 通过合并 2x2 补丁实现 2D 特征图的空间下采样
+
 class PatchMerging2D(nn.Module):
     def __init__(self, dim, out_dim=-1, norm_layer=nn.LayerNorm, channel_first=False):
         """
@@ -78,44 +78,44 @@ class PatchMerging2D(nn.Module):
         self.dim = dim
         Linear = Linear2d if channel_first else nn.Linear
         self._patch_merging_pad = self._patch_merging_pad_channel_first if channel_first else self._patch_merging_pad_channel_last
-        # 线性层用于降低拼接补丁的维度
+
         self.reduction = Linear(4 * dim, (2 * dim) if out_dim < 0 else out_dim, bias=False)
         self.norm = norm_layer(4 * dim)
 
     @staticmethod
     def _patch_merging_pad_channel_last(x: torch.Tensor):
-        # 对输入 (B, H, W, C) 进行填充并分割为 2x2 补丁，沿通道维度拼接
+
         H, W, _ = x.shape[-3:]
         if (W % 2 != 0) or (H % 2 != 0):
             x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
-        x0 = x[..., 0::2, 0::2, :]  # 左上补丁
-        x1 = x[..., 1::2, 0::2, :]  # 左下补丁
-        x2 = x[..., 0::2, 1::2, :]  # 右上补丁
-        x3 = x[..., 1::2, 1::2, :]  # 右下补丁
-        x = torch.cat([x0, x1, x2, x3], -1)  # 拼接: (B, H/2, W/2, 4*C)
+        x0 = x[..., 0::2, 0::2, :]
+        x1 = x[..., 1::2, 0::2, :]
+        x2 = x[..., 0::2, 1::2, :]
+        x3 = x[..., 1::2, 1::2, :]
+        x = torch.cat([x0, x1, x2, x3], -1)
         return x
 
     @staticmethod
     def _patch_merging_pad_channel_first(x: torch.Tensor):
-        # 类似 _patch_merging_pad_channel_last，但适用于 (B, C, H, W)
+
         H, W = x.shape[-2:]
         if (W % 2 != 0) or (H % 2 != 0):
             x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
-        x0 = x[..., 0::2, 0::2]  # 左上补丁
-        x1 = x[..., 1::2, 0::2]  # 左下补丁
-        x2 = x[..., 0::2, 1::2]  # 右上补丁
-        x3 = x[..., 1::2, 1::2]  # 右下补丁
-        x = torch.cat([x0, x1, x2, x3], 1)  # 拼接: (B, 4*C, H/2, W/2)
+        x0 = x[..., 0::2, 0::2]
+        x1 = x[..., 1::2, 0::2]
+        x2 = x[..., 0::2, 1::2]
+        x3 = x[..., 1::2, 1::2]
+        x = torch.cat([x0, x1, x2, x3], 1)
         return x
 
     def forward(self, x):
-        # 应用填充、归一化和维度降低
+
         x = self._patch_merging_pad(x)
         x = self.norm(x)
         x = self.reduction(x)
         return x
 
-# Permute: 实用模块，用于重新排列张量维度
+
 class Permute(nn.Module):
     def __init__(self, *args):
         super().__init__()
@@ -124,7 +124,7 @@ class Permute(nn.Module):
     def forward(self, x: torch.Tensor):
         return x.permute(*self.args)
 
-# Mlp: 标准的两层 MLP，包含线性层和激活函数
+
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0., channels_first=False):
         """
@@ -155,7 +155,7 @@ class Mlp(nn.Module):
         x = self.drop(x)
         return x
 
-# Mlp2: 与 Mlp 相同（可能是为了兼容性或测试）
+
 class Mlp2(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0., channels_first=False):
         super().__init__()
@@ -175,7 +175,7 @@ class Mlp2(nn.Module):
         x = self.drop(x)
         return x
 
-# gMlp: 门控 MLP，通过拆分激活增强表达能力
+
 class gMlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0., channels_first=False):
         """
@@ -194,36 +194,36 @@ class gMlp(nn.Module):
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
         Linear = Linear2d if channels_first else nn.Linear
-        self.fc1 = Linear(in_features, 2 * hidden_features)  # 隐藏维度翻倍以支持门控
+        self.fc1 = Linear(in_features, 2 * hidden_features)
         self.act = act_layer()
         self.fc2 = Linear(hidden_features, out_features)
         self.drop = nn.Dropout(drop)
 
     def forward(self, x: torch.Tensor):
         x = self.fc1(x)
-        # 将输出拆分为数据和门控两部分
+
         x, z = x.chunk(2, dim=(1 if self.channel_first else -1))
-        # 对门控部分应用激活并与数据部分相乘
+
         x = self.fc2(x * self.act(z))
         x = self.drop(x)
         return x
 
-# SoftmaxSpatial: 空间维度的 Softmax，适用于 2D 输入
+
 class SoftmaxSpatial(nn.Softmax):
     def forward(self, x: torch.Tensor):
         if self.dim == -1:
             B, C, H, W = x.shape
-            # 将 (B, C, H, W) 展平为 (B, C, H*W) 以应用 Softmax
+
             return super().forward(x.view(B, C, -1)).view(B, C, H, W)
         elif self.dim == 1:
             B, H, W, C = x.shape
-            # 将 (B, H, W, C) 展平为 (B, H*W, C) 以应用 Softmax
+
             return super().forward(x.view(B, -1, C)).view(B, H, W, C)
         else:
             raise NotImplementedError
 
-# =====================================================
-# mamba_init: 提供 Mamba 模型的参数初始化方法
+
+
 class mamba_init:
     @staticmethod
     def dt_init(dt_rank, d_inner, dt_scale=1.0, dt_init="random", dt_min=0.001, dt_max=0.1, dt_init_floor=1e-4):
@@ -242,7 +242,7 @@ class mamba_init:
             nn.Linear: 初始化后的时间步长投影层。
         """
         dt_proj = nn.Linear(dt_rank, d_inner, bias=True)
-        # 初始化权重以保持方差
+
         dt_init_std = dt_rank**-0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(dt_proj.weight, dt_init_std)
@@ -250,7 +250,7 @@ class mamba_init:
             nn.init.uniform_(dt_proj.weight, -dt_init_std, dt_init_std)
         else:
             raise NotImplementedError
-        # 初始化偏置，使 F.softplus(dt_bias) 在 dt_min 和 dt_max 之间
+
         dt = torch.exp(
             torch.rand(d_inner) * (math.log(dt_max) - math.log(dt_min))
             + math.log(dt_min)
@@ -279,13 +279,13 @@ class mamba_init:
             "n -> d n",
             d=d_inner,
         ).contiguous()
-        A_log = torch.log(A)  # 保持 fp32 精度
+        A_log = torch.log(A)
         if copies > 0:
             A_log = repeat(A_log, "d n -> r d n", r=copies)
             if merge:
                 A_log = A_log.flatten(0, 1)
         A_log = nn.Parameter(A_log)
-        A_log._no_weight_decay = True  # 禁用权重衰减
+        A_log._no_weight_decay = True
         return A_log
 
     @staticmethod
@@ -307,33 +307,33 @@ class mamba_init:
             if merge:
                 D = D.flatten(0, 1)
         D = nn.Parameter(D)
-        D._no_weight_decay = True  # 禁用权重衰减
+        D._no_weight_decay = True
         return D
 
-# BiSTSSM_v2: Mamba 模型的第二版实现，定义核心前向传播逻辑
+
 class BiSTSSM_v2:
     def __initv2__(
         self,
-        # 基本维度参数
+
         d_model=96,
         d_state=16,
         ssm_ratio=2.0,
         dt_rank="auto",
         act_layer=nn.SiLU,
-        # 深度卷积参数
+
         d_conv=3,
         conv_bias=True,
-        # 其他参数
+
         dropout=0.0,
         bias=False,
-        # 时间步长初始化参数
+
         dt_min=0.001,
         dt_max=0.1,
         dt_init="random",
         dt_scale=1.0,
         dt_init_floor=1e-4,
         initialize="v0",
-        # 前向类型
+
         forward_type="v2",
         channel_first=False,
         **kwargs,
@@ -361,14 +361,14 @@ class BiSTSSM_v2:
         """
         factory_kwargs = {"device": None, "dtype": None}
         super().__init__()
-        d_inner = int(ssm_ratio * d_model)  # 内部维度
+        d_inner = int(ssm_ratio * d_model)
         dt_rank = math.ceil(d_model / 16) if dt_rank == "auto" else dt_rank
         self.channel_first = channel_first
         self.with_dconv = d_conv > 1
         Linear = Linear2d if channel_first else nn.Linear
         self.forward = self.forwardv2
 
-        # 解析 forward_type 的后缀以配置前向传播行为
+
         def checkpostfix(tag, value):
             ret = value[-len(tag):] == tag
             if ret:
@@ -384,7 +384,7 @@ class BiSTSSM_v2:
         out_norm_softmax, forward_type = checkpostfix("_onsoftmax", forward_type)
         out_norm_sigmoid, forward_type = checkpostfix("_onsigmoid", forward_type)
 
-        # 配置输出归一化层
+
         if out_norm_none:
             self.out_norm = nn.Identity()
         elif out_norm_dwconv3:
@@ -401,7 +401,7 @@ class BiSTSSM_v2:
             LayerNorm = LayerNorm2d if channel_first else nn.LayerNorm
             self.out_norm = LayerNorm(d_inner)
 
-        # 定义支持的前向传播类型
+
         FORWARD_TYPES = dict(
             v01=partial(self.forward_corev2, force_fp32=(not self.disable_force32), SelectiveScan=SelectiveScanMamba),
             v02=partial(self.forward_corev2, force_fp32=(not self.disable_force32), SelectiveScan=SelectiveScanMamba, CrossScan=CrossScanTriton, CrossMerge=CrossMergeTriton),
@@ -423,46 +423,46 @@ class BiSTSSM_v2:
             v32dc=partial(self.forward_corev2, force_fp32=False, SelectiveScan=SelectiveScanOflex, cascade2d=True),
         )
         self.forward_core = FORWARD_TYPES.get(forward_type, None)
-        k_group = 4  # 扫描组数（用于多方向扫描）
+        k_group = 4
 
-        # 输入投影层
+
         d_proj = d_inner if self.disable_z else (d_inner * 2)
         self.in_proj = Linear(d_model, d_proj, bias=bias)
         self.act = act_layer()
 
-        # # 深度卷积层
-        # if self.with_dconv:
-        #     self.conv2d = nn.Conv2d(
-        #         in_channels=d_inner,
-        #         out_channels=d_inner,
-        #         groups=d_inner,
-        #         bias=conv_bias,
-        #         kernel_size=d_conv,
-        #         padding=(d_conv - 1) // 2,
-        #         **factory_kwargs,
-        #     )
 
-        # 深度可分离卷积层
+
+
+
+
+
+
+
+
+
+
+
+
         if self.with_dconv:
-            # 深度卷积 (Depthwise)
+
             self.conv_dw = nn.Conv2d(
                 in_channels=d_inner,
                 out_channels=d_inner,
-                groups=d_inner,  # 每个通道独立卷积
-                bias=False,  # 禁用偏置以减少参数
-                kernel_size=d_conv,  # 默认 3x3
-                padding=(d_conv - 1) // 2,  # 保持分辨率
+                groups=d_inner,
+                bias=False,
+                kernel_size=d_conv,
+                padding=(d_conv - 1) // 2,
                 **factory_kwargs,
             )
-            # 逐点卷积 (Pointwise)
+
             self.conv_pw = nn.Conv2d(
                 in_channels=d_inner,
                 out_channels=d_inner,
-                kernel_size=1,  # 1x1 卷积
-                bias=conv_bias,  # 保留偏置以增强表达
+                kernel_size=1,
+                bias=conv_bias,
                 **factory_kwargs,
             )
-            # 初始化权重
+
             nn.init.kaiming_normal_(self.conv_dw.weight, mode='fan_out', nonlinearity='relu')
             nn.init.kaiming_normal_(self.conv_pw.weight, mode='fan_out', nonlinearity='relu')
             if conv_bias:
@@ -470,30 +470,30 @@ class BiSTSSM_v2:
 
 
 
-        # x 投影层（生成时间步长、状态矩阵 B 和 C）
+
         self.x_proj = [
             nn.Linear(d_inner, (dt_rank + d_state * 2), bias=False)
             for _ in range(k_group)
         ]
-        self.x_proj_weight = nn.Parameter(torch.stack([t.weight for t in self.x_proj], dim=0))  # (K, N, inner)
+        self.x_proj_weight = nn.Parameter(torch.stack([t.weight for t in self.x_proj], dim=0))
         del self.x_proj
 
-        # 输出投影层
+
         self.out_act = nn.GELU() if self.oact else nn.Identity()
         self.out_proj = Linear(d_inner, d_model, bias=bias)
         self.dropout = nn.Dropout(dropout) if dropout > 0. else nn.Identity()
 
-        # 初始化时间步长、状态矩阵 A 和跳跃参数 D
+
         if initialize in ["v0"]:
             self.dt_projs = [
                 self.dt_init(dt_rank, d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor)
                 for _ in range(k_group)
             ]
-            self.dt_projs_weight = nn.Parameter(torch.stack([t.weight for t in self.dt_projs], dim=0))  # (K, inner, rank)
-            self.dt_projs_bias = nn.Parameter(torch.stack([t.bias for t in self.dt_projs], dim=0))  # (K, inner)
+            self.dt_projs_weight = nn.Parameter(torch.stack([t.weight for t in self.dt_projs], dim=0))
+            self.dt_projs_bias = nn.Parameter(torch.stack([t.bias for t in self.dt_projs], dim=0))
             del self.dt_projs
-            self.A_logs = self.A_log_init(d_state, d_inner, copies=k_group, merge=True)  # (K * D, N)
-            self.Ds = self.D_init(d_inner, copies=k_group, merge=True)  # (K * D)
+            self.A_logs = self.A_log_init(d_state, d_inner, copies=k_group, merge=True)
+            self.Ds = self.D_init(d_inner, copies=k_group, merge=True)
         elif initialize in ["v1"]:
             self.Ds = nn.Parameter(torch.ones((k_group * d_inner)))
             self.A_logs = nn.Parameter(torch.randn((k_group * d_inner, d_state)))
@@ -571,8 +571,8 @@ class BiSTSSM_v2:
                 else:
                     _B, _D, _L = XB * XW, XD, XH
                     xs = x.permute(0, 3, 1, 2).contiguous()
-                # 只保留正向扫描
-                xs = xs.unsqueeze(2)  # (B*H, D, 1, W) 或 (B*W, D, 1, H)
+
+                xs = xs.unsqueeze(2)
                 if no_einsum:
                     x_dbl = F.conv1d(xs.view(_B, -1, _L), proj_weight.view(-1, _D, 1), bias=(proj_bias.view(-1) if proj_bias is not None else None), groups=1)
                     dts, Bs, Cs = torch.split(x_dbl.view(_B, 1, -1, _L), [R, N, N], dim=2)
@@ -686,11 +686,11 @@ class BiSTSSM_v2:
                 z = self.act(z)
         if not self.channel_first:
             x = x.permute(0, 3, 1, 2).contiguous()
-        # if self.with_dconv:
-        #     x = self.conv2d(x)
+
+
         if self.with_dconv:
-            x = self.conv_dw(x)  # 深度卷积 (b, d, h, w)
-            x = self.conv_pw(x)  # 逐点卷积 (b, d, h, w)
+            x = self.conv_dw(x)
+            x = self.conv_pw(x)
         x = self.act(x)
         y = self.forward_core(x)
         y = self.out_act(y)
@@ -699,7 +699,7 @@ class BiSTSSM_v2:
         out = self.dropout(self.out_proj(y))
         return out
 
-# BiSTSSM: 继承 mamba_init 和 BiSTSSM_v2 的 Mamba 模型实现
+
 class BiSTSSM(nn.Module, mamba_init, BiSTSSM_v2):
     def __init__(
         self,
@@ -737,7 +737,7 @@ class BiSTSSM(nn.Module, mamba_init, BiSTSSM_v2):
         )
         self.__initv2__(**kwargs)
 
-# BiSTSSMBlock: Mamba 模型的基本块，结合 SSM 和 MLP
+
 class BiSTSSMBlock(nn.Module):
     def __init__(
         self,
@@ -745,7 +745,7 @@ class BiSTSSMBlock(nn.Module):
         drop_path: float = 0,
         norm_layer: nn.Module = nn.LayerNorm,
         channel_first=False,
-        # SSM 参数
+
         ssm_d_state: int = 16,
         ssm_ratio=2.0,
         ssm_dt_rank: Any = "auto",
@@ -755,12 +755,12 @@ class BiSTSSMBlock(nn.Module):
         ssm_drop_rate: float = 0,
         ssm_init="v0",
         forward_type="v2",
-        # MLP 参数
+
         mlp_ratio=4.0,
         mlp_act_layer=nn.GELU,
         mlp_drop_rate: float = 0.0,
         gmlp=False,
-        # 其他参数
+
         use_checkpoint: bool = False,
         post_norm: bool = False,
         **kwargs,
@@ -830,9 +830,9 @@ class BiSTSSMBlock(nn.Module):
         """
         x = input
         if self.ssm_branch:
-            x = x + self.drop_path(self.op(self.norm(x)))  # 残差连接：SSM 路径
+            x = x + self.drop_path(self.op(self.norm(x)))
         if self.mlp_branch:
-            x = x + self.drop_path(self.mlp(self.norm2(x)))  # 残差连接：MLP 路径
+            x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
     def forward(self, input: torch.Tensor):

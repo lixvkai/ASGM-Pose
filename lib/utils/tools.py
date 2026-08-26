@@ -61,7 +61,7 @@ def ensure_dir(path):
     """
     if not os.path.exists(path):
         os.makedirs(path)
-        
+
 def read_pkl(data_url):
     file = open(data_url,'rb')
     content = pickle.load(file)

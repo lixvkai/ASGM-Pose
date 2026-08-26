@@ -22,7 +22,7 @@ YELLOW = WARNING
 
 class colorlogger():
     def __init__(self, log_dir, log_name='train_logs.txt'):
-        # set log
+
         self._logger = logging.getLogger(log_name)
         self._logger.setLevel(logging.INFO)
         log_file = os.path.join(log_dir, log_name)
@@ -118,7 +118,7 @@ def ensure_path(path, remove=True):
 def set_save_path(save_path, remove=True):
     ensure_path(save_path, remove=remove)
     set_log_path(save_path)
-    # writer = SummaryWriter(os.path.join(save_path, 'tensorboard'))
+
     return log
 
 

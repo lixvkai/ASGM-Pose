@@ -61,7 +61,7 @@ def flip_data(data):
     left_joints = [4, 5, 6, 11, 12, 13]
     right_joints = [1, 2, 3, 14, 15, 16]
     flipped_data = copy.deepcopy(data)
-    flipped_data[..., 0] *= -1                                               # flip x of all joints
+    flipped_data[..., 0] *= -1
     flipped_data[..., left_joints+right_joints, :] = flipped_data[..., right_joints+left_joints, :]
     return flipped_data
 
@@ -69,9 +69,9 @@ def resample(ori_len, target_len, replay=False, randomness=True):
     if replay:
         if ori_len > target_len:
             st = np.random.randint(ori_len-target_len)
-            return range(st, st+target_len)  # Random clipping from sequence
+            return range(st, st+target_len)
         else:
-            return np.array(range(target_len)) % ori_len  # Replay padding
+            return np.array(range(target_len)) % ori_len
     else:
         if randomness:
             even = np.linspace(0, ori_len, num=target_len, endpoint=False)
@@ -103,7 +103,7 @@ def split_clips(vid_list, n_frames, data_stride):
             n_clips += 1
         if i==len(vid_list):
             break
-        if vid_list[i]!=vid_list[i-1]: 
+        if vid_list[i]!=vid_list[i-1]:
             if not (vid_list[i-1] in saved):
                 resampled = resample(i-st, n_frames) + st
                 result.append(resampled)

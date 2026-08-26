@@ -4,7 +4,7 @@ import numpy as np
 import torch.nn.functional as F
 
 
-# Numpy-based errors
+
 
 def mpjpe(predicted, target):
     """
@@ -39,28 +39,28 @@ def p_mpjpe(predicted, target):
     V = Vt.transpose(0, 2, 1)
     R = np.matmul(V, U.transpose(0, 2, 1))
 
-    # Avoid improper rotations (reflections), i.e. rotations with det(R) = -1
+
     sign_detR = np.sign(np.expand_dims(np.linalg.det(R), axis=1))
     V[:, :, -1] *= sign_detR
     s[:, -1] *= sign_detR.flatten()
-    R = np.matmul(V, U.transpose(0, 2, 1))  # Rotation
+    R = np.matmul(V, U.transpose(0, 2, 1))
     tr = np.expand_dims(np.sum(s, axis=1, keepdims=True), axis=2)
-    a = tr * normX / normY  # Scale
-    t = muX - a * np.matmul(muY, R)  # Translation
-    # Perform rigid transformation on the input
+    a = tr * normX / normY
+    t = muX - a * np.matmul(muY, R)
+
     predicted_aligned = a * np.matmul(predicted, R) + t
-    # Return MPJPE
+
     return np.mean(np.linalg.norm(predicted_aligned - target, axis=len(target.shape) - 1), axis=1)
 
 
-# PyTorch-based errors (for losses)
+
 
 def loss_mpjpe(predicted, target):
     """
     Mean per-joint position error (i.e. mean Euclidean distance),
     often referred to as "Protocol #1" in many papers.
     """
-    # print(predicted.shape, target.shape)
+
     assert predicted.shape == target.shape
     return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1))
 
@@ -70,8 +70,8 @@ def weighted_mpjpe(predicted, target, w):
     Weighted mean per-joint position error (i.e. mean Euclidean distance)
     """
     assert predicted.shape == target.shape
-    # print(predicted.shape, w.shape)
-    assert w.shape[0] == predicted.shape[2]  # torch.Size([24, 243, 17, 3]) torch.Size([17])
+
+    assert w.shape[0] == predicted.shape[2]
     return torch.mean(w * torch.norm(predicted - target, dim=len(target.shape) - 1))
 
 
@@ -139,7 +139,7 @@ def loss_limb_gt(x, gt):
         Input: (N, T, 17, 3), (N, T, 17, 3)
     '''
     limb_lens_x = get_limb_lens(x)
-    limb_lens_gt = get_limb_lens(gt)  # (N, T, 16)
+    limb_lens_gt = get_limb_lens(gt)
     return nn.L1Loss()(limb_lens_x, limb_lens_gt)
 
 

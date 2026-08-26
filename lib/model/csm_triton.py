@@ -1,16 +1,16 @@
-# if you are using py37, add this line to functools.py
-# cached_property = lambda func: property(lru_cache()(func))
 
-# triton cross scan, 2x speed than pytorch implementation =========================
+
+
+
 import torch
 import triton
 import triton.language as tl
 
-# BCHW -> BCHW ============================================
+
 @triton.jit
 def triton_cross_scan(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -31,10 +31,10 @@ def triton_cross_scan(
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
     p_x = x + i_b * _tmp1 + _tmp2
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]  # trans
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH  # trans + flip
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH
 
     for idxc in range(_for_C):
         _idx = idxc * DH * DW
@@ -46,8 +46,8 @@ def triton_cross_scan(
 
 @triton.jit
 def triton_cross_merge(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -68,10 +68,10 @@ def triton_cross_merge(
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
     p_x = x + i_b * _tmp1 + _tmp2
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]  # trans
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH  # trans + flip
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH
 
     for idxc in range(_for_C):
         _idx = idxc * DH * DW
@@ -83,8 +83,8 @@ def triton_cross_merge(
 
 @triton.jit
 def triton_cross_scan_1b1(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -104,11 +104,11 @@ def triton_cross_scan_1b1(
     _tmp0 = i_c * BC * DH * DW
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]  # trans
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH  # trans + flip
-    
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH
+
     p_x1 = x + i_b * 4 * _tmp1 + _tmp2
     p_x2 = p_x1 + _tmp1
     p_x3 = p_x2 + _tmp1
@@ -122,8 +122,8 @@ def triton_cross_scan_1b1(
 
 @triton.jit
 def triton_cross_merge_1b1(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -143,10 +143,10 @@ def triton_cross_merge_1b1(
     _tmp0 = i_c * BC * DH * DW
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]  # trans
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH  # trans + flip
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp0 + i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH
 
     p_x1 = x + i_b * 4 * _tmp1 + _tmp2
     p_x2 = p_x1 + _tmp1
@@ -173,10 +173,10 @@ class CrossScanTriton(torch.autograd.Function):
         y = x.new_empty((B, 4, C, H, W))
         triton_cross_scan[(NH * NW, NC, B)](x, y, BC, BH, BW, C, H, W, NH, NW)
         return y.view(B, 4, C, -1)
-    
+
     @staticmethod
     def backward(ctx, y: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         BC, BH, BW, NC, NH, NW = ctx.triton_shape
         y = y.contiguous().view(B, 4, C, H, W)
@@ -198,10 +198,10 @@ class CrossMergeTriton(torch.autograd.Function):
         x = y.new_empty((B, C, H, W))
         triton_cross_merge[(NH * NW, NC, B)](x, y, BC, BH, BW, C, H, W, NH, NW)
         return x.view(B, C, -1)
-    
+
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # out: (b, d, l)
+
         B, C, H, W = ctx.shape
         BC, BH, BW, NC, NH, NW = ctx.triton_shape
         x = x.contiguous()
@@ -223,10 +223,10 @@ class CrossScanTriton1b1(torch.autograd.Function):
         y = x.new_empty((B, 4, C, H, W))
         triton_cross_scan_1b1[(NH * NW, NC, B)](x, y, BC, BH, BW, C, H, W, NH, NW)
         return y.view(B, 4, C, -1)
-    
+
     @staticmethod
     def backward(ctx, y: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         BC, BH, BW, NC, NH, NW = ctx.triton_shape
         y = y.contiguous().view(B, 4, C, H, W)
@@ -235,11 +235,11 @@ class CrossScanTriton1b1(torch.autograd.Function):
         return x
 
 
-# BHWC -> BCHW ============================================
+
 @triton.jit
 def triton_cross_scan_flex(
-    x, # (B, C, H, W) | (B, H, W, C) | (B, 4, C, H, W) | (B, H, W, 4, C)
-    y, # (B, 4, C, H, W) | (B, H, W, 4, C)
+    x,
+    y,
     x_layout: tl.constexpr,
     y_layout: tl.constexpr,
     operation: tl.constexpr,
@@ -253,10 +253,10 @@ def triton_cross_scan_flex(
     NH: tl.constexpr,
     NW: tl.constexpr,
 ):
-    # x_layout = 0
-    # y_layout = 1 # 0 BCHW, 1 BHWC
-    # operation = 0 # 0 scan, 1 merge
-    # onebyone = 0 # 0 false, 1 true
+
+
+
+
 
     i_hw, i_c, i_b = tl.program_id(0), tl.program_id(1), tl.program_id(2)
     i_h, i_w = (i_hw // NW), (i_hw % NW)
@@ -266,9 +266,9 @@ def triton_cross_scan_flex(
     _for_C = min(DC - i_c * BC, BC)
 
     HWRoute0 = i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
-    HWRoute1 = i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]  # trans
-    HWRoute2 = (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
-    HWRoute3 = (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH  # trans + flip
+    HWRoute1 = i_w * BW * DH + tl.arange(0, BW)[None, :] * DH + i_h * BH + tl.arange(0, BH)[:, None]
+    HWRoute2 = (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
+    HWRoute3 = (NW - i_w - 1) * BW * DH  + (BW - 1 - tl.arange(0, BW)[None, :]) * DH + (NH - i_h - 1) * BH + (BH - 1 - tl.arange(0, BH)[:, None]) + (DH - NH * BH) + (DW - NW * BW) * DH
 
     _tmp1 = DC * DH * DW
 
@@ -282,8 +282,8 @@ def triton_cross_scan_flex(
         p_y1 = y_ptr_base + HWRoute0 * 4 * DC
         p_y2 = y_ptr_base + DC + HWRoute1 * 4 * DC
         p_y3 = y_ptr_base + 2 * DC + HWRoute2 * 4 * DC
-        p_y4 = y_ptr_base + 3 * DC + HWRoute3 * 4 * DC       
-    
+        p_y4 = y_ptr_base + 3 * DC + HWRoute3 * 4 * DC
+
     if onebyone == 0:
         x_ptr_base = x + i_b * _tmp1 + (i_c * BC * DH * DW if x_layout == 0 else i_c * BC)
         if x_layout == 0:
@@ -316,13 +316,13 @@ def triton_cross_scan_flex(
             p_x1 = x_ptr_base + HWRoute0
             p_x2 = p_x1 + _tmp1
             p_x3 = p_x2 + _tmp1
-            p_x4 = p_x3 + _tmp1  
+            p_x4 = p_x3 + _tmp1
         else:
             p_x1 = x_ptr_base + HWRoute0 * 4 * DC
             p_x2 = p_x1 + DC
             p_x3 = p_x2 + DC
-            p_x4 = p_x3 + DC        
-    
+            p_x4 = p_x3 + DC
+
         if operation == 0:
             for idxc in range(_for_C):
                 _idx_x = idxc * DH * DW if x_layout == 0 else idxc
@@ -357,10 +357,10 @@ class CrossScanTritonF(torch.autograd.Function):
         y = x.new_empty((B, 4, C, H, W))
         triton_cross_scan_flex[(NH * NW, NC, B)](x, y, (0 if channel_first else 1), 0, 0, 0, BC, BH, BW, C, H, W, NH, NW)
         return y.view(B, 4, C, -1)
-    
+
     @staticmethod
     def backward(ctx, y: torch.Tensor):
-        # out: (b, k, d, l)
+
         channel_first = ctx.channel_first
         B, C, H, W = ctx.shape
         BC, BH, BW, NC, NH, NW = ctx.triton_shape
@@ -384,10 +384,10 @@ class CrossMergeTritonF(torch.autograd.Function):
         x = y.new_empty((B, C, H, W)) if channel_first else y.new_empty((B, H, W, C))
         triton_cross_scan_flex[(NH * NW, NC, B)](x, y, (0 if channel_first else 1), 0, 1, 0, BC, BH, BW, C, H, W, NH, NW)
         return x.view(B, C, -1) if channel_first else x.view(B, -1, C)
-    
+
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # out: (b, d, l)
+
         channel_first = ctx.channel_first
         B, C, H, W = ctx.shape
         BC, BH, BW, NC, NH, NW = ctx.triton_shape
@@ -413,10 +413,10 @@ class CrossScanTriton1b1F(torch.autograd.Function):
         y = x.new_empty((B, 4, C, H, W))
         triton_cross_scan_flex[(NH * NW, NC, B)](x, y, (0 if channel_first else 1), 0, 0, 1, BC, BH, BW, C, H, W, NH, NW)
         return y.view(B, 4, C, -1)
-    
+
     @staticmethod
     def backward(ctx, y: torch.Tensor):
-        # out: (b, k, d, l)
+
         channel_first = ctx.channel_first
         B, C, H, W = ctx.shape
         BC, BH, BW, NC, NH, NW = ctx.triton_shape
@@ -426,11 +426,11 @@ class CrossScanTriton1b1F(torch.autograd.Function):
         return x, None
 
 
-# for ablations ============================================
+
 @triton.jit
 def triton_cross_scan_unidi(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -451,10 +451,10 @@ def triton_cross_scan_unidi(
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
     p_x = x + i_b * _tmp1 + _tmp2
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2 # same
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp2 # same
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp2 # same
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp2
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp2
 
     for idxc in range(_for_C):
         _idx = idxc * DH * DW
@@ -466,8 +466,8 @@ def triton_cross_scan_unidi(
 
 @triton.jit
 def triton_cross_merge_unidi(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -488,10 +488,10 @@ def triton_cross_merge_unidi(
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
     p_x = x + i_b * _tmp1 + _tmp2
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2 # same
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp2 # same
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp2 # same
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp2
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp2
 
     for idxc in range(_for_C):
         _idx = idxc * DH * DW
@@ -503,8 +503,8 @@ def triton_cross_merge_unidi(
 
 @triton.jit
 def triton_cross_scan_bidi(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -525,10 +525,10 @@ def triton_cross_scan_bidi(
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
     p_x = x + i_b * _tmp1 + _tmp2
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2 # same
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
 
     for idxc in range(_for_C):
         _idx = idxc * DH * DW
@@ -540,8 +540,8 @@ def triton_cross_scan_bidi(
 
 @triton.jit
 def triton_cross_merge_bidi(
-    x, # (B, C, H, W)
-    y, # (B, 4, C, H, W)
+    x,
+    y,
     BC: tl.constexpr,
     BH: tl.constexpr,
     BW: tl.constexpr,
@@ -562,10 +562,10 @@ def triton_cross_merge_bidi(
     _tmp1 = DC * DH * DW
     _tmp2 = _tmp0 + i_h * BH * DW  + tl.arange(0, BH)[:, None] * DW + i_w * BW + tl.arange(0, BW)[None, :]
     p_x = x + i_b * _tmp1 + _tmp2
-    p_y1 = y + i_b * 4 * _tmp1 + _tmp2 # same
-    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2 # same
-    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
-    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW) # flip
+    p_y1 = y + i_b * 4 * _tmp1 + _tmp2
+    p_y2 = y + i_b * 4 * _tmp1 + _tmp1 + _tmp2
+    p_y3 = y + i_b * 4 * _tmp1 + 2 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
+    p_y4 = y + i_b * 4 * _tmp1 + 3 * _tmp1 + _tmp0 + (NH - i_h - 1) * BH * DW  + (BH - 1 - tl.arange(0, BH)[:, None]) * DW + (NW - i_w - 1) * BW + (BW - 1 - tl.arange(0, BW)[None, :]) + (DH - NH * BH) * DW + (DW - NW * BW)
 
     for idxc in range(_for_C):
         _idx = idxc * DH * DW
@@ -585,7 +585,7 @@ def getCSM(mode=1):
         _triton_cross_merge = triton_cross_merge_unidi
     elif mode == 2:
         _triton_cross_scan = triton_cross_scan_bidi
-        _triton_cross_merge = triton_cross_merge_bidi        
+        _triton_cross_merge = triton_cross_merge_bidi
 
     class CrossScanTriton(torch.autograd.Function):
         @staticmethod
@@ -600,10 +600,10 @@ def getCSM(mode=1):
             y = x.new_empty((B, 4, C, H, W))
             _triton_cross_scan[(NH * NW, NC, B)](x, y, BC, BH, BW, C, H, W, NH, NW)
             return y.view(B, 4, C, -1)
-        
+
         @staticmethod
         def backward(ctx, y: torch.Tensor):
-            # out: (b, k, d, l)
+
             B, C, H, W = ctx.shape
             BC, BH, BW, NC, NH, NW = ctx.triton_shape
             y = y.contiguous().view(B, 4, C, H, W)
@@ -625,10 +625,10 @@ def getCSM(mode=1):
             x = y.new_empty((B, C, H, W))
             _triton_cross_merge[(NH * NW, NC, B)](x, y, BC, BH, BW, C, H, W, NH, NW)
             return x.view(B, C, -1)
-        
+
         @staticmethod
         def backward(ctx, x: torch.Tensor):
-            # out: (b, d, l)
+
             B, C, H, W = ctx.shape
             BC, BH, BW, NC, NH, NW = ctx.triton_shape
             x = x.contiguous()
@@ -659,7 +659,7 @@ class CHECK:
                 torch.flip(torch.transpose(x, dim0=2, dim1=3).contiguous().view(B, C, L), dims=[-1]),
             ], dim=1).view(B, 4, C, L)
             return xs
-        
+
         def cross_merge(out_y: torch.Tensor):
             B, K, D, H, W = out_y.shape
             L = H * W
@@ -680,12 +680,12 @@ class CHECK:
                 torch.flip(torch.transpose(x[:, 3], dim0=2, dim1=3).contiguous().view(B, C, L), dims=[-1]),
             ], dim=1).view(B, 4, C, L)
             return xs
-        
+
         def unidi_scan(x):
             B, C, H, W = x.shape
             x = x.view(B, 1, C, H * W).repeat(1, 4, 1, 1)
             return x
-        
+
         def unidi_merge(ys):
             B, K, C, H, W = ys.shape
             return ys.view(B, 4, -1, H * W).sum(1)
@@ -695,7 +695,7 @@ class CHECK:
             x = x.view(B, 1, C, H * W).repeat(1, 2, 1, 1)
             x = torch.cat([x, x.flip(dims=[-1])], dim=1)
             return x
-        
+
         def bidi_merge(ys):
             B, K, D, H, W = ys.shape
             ys = ys.view(B, K, D, -1)

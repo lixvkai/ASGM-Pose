@@ -20,9 +20,9 @@ def save_clips(subset_name, root_path, train_data, train_labels):
             "data_input": data_input,
             "data_label": data_label
         }
-        with open(os.path.join(save_path, "%08d.pkl" % i), "wb") as myprofile:  
+        with open(os.path.join(save_path, "%08d.pkl" % i), "wb") as myprofile:
             pickle.dump(data_dict, myprofile)
-            
+
 datareader = DataReaderH36M(n_frames=243, sample_stride=1, data_stride_train=81, data_stride_test=243, dt_file = 'h36m_sh_conf_cam_source_final.pkl', dt_root='data/motion3d/')
 train_data, test_data, train_labels, test_labels = datareader.get_sliced_data()
 print(train_data.shape, test_data.shape)

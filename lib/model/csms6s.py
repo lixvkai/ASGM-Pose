@@ -1,7 +1,7 @@
 import torch
 
 
-# pytorch cross scan =============
+
 class CrossScan(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x: torch.Tensor):
@@ -15,7 +15,7 @@ class CrossScan(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, ys: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         L = H * W
         ys = ys[:, 0:2] + ys[:, 2:4].flip(dims=[-1]).view(B, 2, -1, L)
@@ -32,12 +32,12 @@ class CrossScan_fs_ft(torch.autograd.Function):
         xs[:, 0] = x.flatten(2, 3)
         xs[:, 1] = x.transpose(dim0=2, dim1=3).flatten(2, 3)
         xs[:, 2:4] = xs[:, 0:2]
-        # print('CrossScan_fs_ft')
+
         return xs
 
     @staticmethod
     def backward(ctx, ys: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         L = H * W
         ys = ys[:, 0:2] + ys[:, 2:4].view(B, 2, -1, L)
@@ -57,8 +57,8 @@ class CrossMerge_fs_ft(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # B, D, L = x.shape
-        # out: (b, k, d, l)
+
+
         H, W = ctx.shape
         B, C, L = x.shape
         xs = x.new_empty((B, 4, C, L))
@@ -78,12 +78,12 @@ class CrossScan_bs_ft(torch.autograd.Function):
         xs[:, 0] = torch.flip(x, dims=[-1]).flatten(2, 3)
         xs[:, 1] = x.transpose(dim0=2, dim1=3).flatten(2, 3)
         xs[:, 2:4] = xs[:, 0:2]
-        # print('CrossScan_fs_ft')
+
         return xs
 
     @staticmethod
     def backward(ctx, ys: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         L = H * W
         ys = ys[:, 0:2] + ys[:, 2:4].view(B, 2, -1, L)
@@ -109,8 +109,8 @@ class CrossMerge_bs_ft(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # B, D, L = x.shape
-        # out: (b, k, d, l)
+
+
         H, W = ctx.shape
         B, C, L = x.shape
         xs = x.new_empty((B, 4, C, L))
@@ -130,12 +130,12 @@ class CrossScan_fs_bt(torch.autograd.Function):
         xs[:, 0] = x.flatten(2, 3)
         xs[:, 1] = torch.flip(x.transpose(dim0=2, dim1=3), dims=[-1]).flatten(2, 3)
         xs[:, 2:4] = xs[:, 0:2]
-        # print('CrossScan_fs_ft')
+
         return xs
 
     @staticmethod
     def backward(ctx, ys: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         L = H * W
         ys = ys[:, 0:2] + ys[:, 2:4].view(B, 2, -1, L)
@@ -155,8 +155,8 @@ class CrossMerge_fs_bt(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # B, D, L = x.shape
-        # out: (b, k, d, l)
+
+
         H, W = ctx.shape
         B, C, L = x.shape
         xs = x.new_empty((B, 4, C, L))
@@ -182,7 +182,7 @@ class CrossScan_plus_poselimbs(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, ys: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         L = H * W
         ys = ys[:, 0:2] + ys[:, 2:4].flip(dims=[-1]).view(B, 2, -1, L)
@@ -202,8 +202,8 @@ class CrossMerge_plus_poselimbs(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # B, D, L = x.shape
-        # out: (b, k, d, l)
+
+
         H, W = ctx.shape
         B, C, L = x.shape
         xs = x.new_empty((B, 4, C, L))
@@ -224,12 +224,12 @@ class CrossScan_bs_bt(torch.autograd.Function):
         xs[:, 0] = torch.flip(x, dims=[-1]).flatten(2, 3)
         xs[:, 1] = torch.flip(x.transpose(dim0=2, dim1=3), dims=[-1]).flatten(2, 3)
         xs[:, 2:4] = xs[:, 0:2]
-        # print('CrossScan_fs_ft')
+
         return xs
 
     @staticmethod
     def backward(ctx, ys: torch.Tensor):
-        # out: (b, k, d, l)
+
         B, C, H, W = ctx.shape
         L = H * W
         ys = ys[:, 0:2] + ys[:, 2:4].view(B, 2, -1, L)
@@ -251,8 +251,8 @@ class CrossMerge_bs_bt(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # B, D, L = x.shape
-        # out: (b, k, d, l)
+
+
         H, W = ctx.shape
         B, C, L = x.shape
         xs = x.new_empty((B, 4, C, L))
@@ -275,8 +275,8 @@ class CrossMerge(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, x: torch.Tensor):
-        # B, D, L = x.shape
-        # out: (b, k, d, l)
+
+
         H, W = ctx.shape
         B, C, L = x.shape
         xs = x.new_empty((B, 4, C, L))
@@ -287,7 +287,7 @@ class CrossMerge(torch.autograd.Function):
         return xs
 
 
-# these are for ablations =============
+
 class CrossScan_Ab_2direction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x: torch.Tensor):
@@ -350,13 +350,13 @@ class CrossMerge_Ab_1direction(torch.autograd.Function):
         return x.view(B, 1, C, H, W).repeat(1, 4, 1, 1, 1)
 
 
-# import selective scan ==============================
+
 try:
     import selective_scan_cuda_oflex
 except Exception as e:
     ...
-    # print(f"WARNING: can not import selective_scan_cuda_oflex.", flush=True)
-    # print(e, flush=True)
+
+
 
 try:
     import selective_scan_cuda_core
@@ -369,8 +369,8 @@ try:
     import selective_scan_cuda
 except Exception as e:
     ...
-    # print(f"WARNING: can not import selective_scan_cuda.", flush=True)
-    # print(e, flush=True)
+
+
 
 
 def check_nan_inf(tag: str, x: torch.Tensor, enable=True):
@@ -381,7 +381,7 @@ def check_nan_inf(tag: str, x: torch.Tensor, enable=True):
             pdb.set_trace()
 
 
-# fvcore flops =======================================
+
 def flops_selective_scan_fn(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, with_complex=False):
     """
     u: r(B D L)
@@ -397,7 +397,7 @@ def flops_selective_scan_fn(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, 
         [.float(), +, .softplus, .shape, new_zeros, repeat, stack, to(dtype), silu]
     """
     assert not with_complex
-    # https://github.com/state-spaces/mamba/issues/110
+
     flops = 9 * B * L * D * N
     if with_D:
         flops += B * D * L
@@ -406,7 +406,7 @@ def flops_selective_scan_fn(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, 
     return flops
 
 
-# this is only for selective_scan_ref...
+
 def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, with_Group=True, with_complex=False):
     """
     u: r(B D L)
@@ -423,19 +423,19 @@ def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False,
     """
     import numpy as np
 
-    # fvcore.nn.jit_handles
+
     def get_flops_einsum(input_shapes, equation):
         np_arrs = [np.zeros(s) for s in input_shapes]
         optim = np.einsum_path(equation, *np_arrs, optimize="optimal")[1]
         for line in optim.split("\n"):
             if "optimized flop" in line.lower():
-                # divided by 2 because we count MAC (multiply-add counted as one flop)
+
                 flop = float(np.floor(float(line.split(":")[-1]) / 2))
                 return flop
 
     assert not with_complex
 
-    flops = 0  # below code flops = 0
+    flops = 0
 
     flops += get_flops_einsum([[B, D, L], [D, N]], "bdl,dn->bdln")
     if with_Group:
@@ -466,8 +466,8 @@ def print_jit_input_names(inputs):
     print("", flush=True)
 
 
-# cross selective scan ===============================
-# comment all checks if inside cross_selective_scan
+
+
 class SelectiveScanMamba(torch.autograd.Function):
     @staticmethod
     @torch.cuda.amp.custom_fwd

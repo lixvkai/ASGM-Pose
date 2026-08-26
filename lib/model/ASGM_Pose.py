@@ -15,7 +15,7 @@ from math import sqrt
 import os
 import sys
 
-# 获取当前工作目录
+
 current_directory = os.path.dirname(__file__) + '/../' + '../'
 sys.path.append(current_directory)
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
@@ -33,7 +33,7 @@ import numpy as np
 
 from lib.model.mambablocks import BiSTSSMBlock
 
-# === GCN implementation from MotionAGFormer ===
+
 CONNECTIONS = {10: [9], 9: [8, 10], 8: [7, 9], 14: [15, 8], 15: [16, 14], 11: [12, 8], 12: [13, 11],
                7: [0, 8], 0: [1, 7], 1: [2, 0], 2: [3, 1], 4: [5, 0], 5: [6, 4], 16: [15], 13: [12], 3: [2], 6: [5]}
 
@@ -144,7 +144,7 @@ class GCN(nn.Module):
         return x
 
 
-# === HoT Token Pruning Functions ===
+
 def index_points(points, idx):
     device = points.device
     B = points.shape[0]
@@ -191,7 +191,7 @@ def cluster_dpc_knn(x, cluster_num, k, token_mask=None):
     return index_down, idx_cluster
 
 
-# === Cross Attention for Token Recovery ===
+
 class Cross_Attention(nn.Module):
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., length=27):
         super().__init__()
@@ -225,7 +225,7 @@ class Cross_Attention(nn.Module):
         return x
 
 
-# === AGCRN-master自适应图卷积本地实现 ===
+
 class AVWGCN(nn.Module):
     def __init__(self, dim_in, dim_out, cheb_k, embed_dim,
                  graph_edge_mode='signed', graph_degree_mode='algebraic',
@@ -269,19 +269,19 @@ class AVWGCN(nn.Module):
         if self.graph_edge_mode == 'positive':
             adj = torch.relu(adj)
 
-        # 添加自环
+
         adj = adj + torch.eye(adj.shape[0], device=adj.device)
 
-        # 计算度矩阵。对于非负邻接，algebraic 与 absolute 等价。
+
         if self.graph_degree_mode == 'absolute':
             degree = adj.abs().sum(dim=1)
         else:
             degree = adj.sum(dim=1)
 
-        # 避免除零
+
         degree = torch.clamp(degree, min=1e-8)
 
-        # 对称归一化: D^(-1/2) * A * D^(-1/2)
+
         degree_inv_sqrt = torch.pow(degree, -0.5)
         degree_inv_sqrt = torch.diag(degree_inv_sqrt)
 
@@ -292,27 +292,20 @@ class AVWGCN(nn.Module):
     def forward(self, x, node_embeddings):
         node_num = node_embeddings.shape[0]
 
-        # 添加数值稳定性检查
+
         if torch.isnan(node_embeddings).any() or torch.isinf(node_embeddings).any():
             print("Warning: node_embeddings contains NaN or Inf values")
             node_embeddings = torch.nan_to_num(node_embeddings, nan=0.0, posinf=1.0, neginf=-1.0)
 
-        # 计算支持矩阵，添加数值稳定性
+
         adj_matrix = torch.mm(node_embeddings, node_embeddings.transpose(0, 1))
 
-        # 保存邻接矩阵（用于可视化或分析）
-        if not hasattr(self, 'adj_matrix_saved'):
-            self.adj_matrix_saved = adj_matrix.detach().cpu().numpy()
-            print(f"Saved adjacency matrix shape: {self.adj_matrix_saved.shape}")
-            # 可以选择保存到文件
-            import numpy as np
-            np.save('learned_adjacency_matrix.npy', self.adj_matrix_saved)
-            print("Adjacency matrix saved to 'learned_adjacency_matrix.npy'")
 
-        # 使用对称归一化提高数值稳定性
+
+
         supports = self.normalize_adjacency(adj_matrix)
 
-        # 检查支持矩阵的数值稳定性
+
         if torch.isnan(supports).any() or torch.isinf(supports).any():
             print("Warning: supports contains NaN or Inf values")
             supports = torch.nan_to_num(supports, nan=0.0, posinf=1.0, neginf=0.0)
@@ -320,11 +313,11 @@ class AVWGCN(nn.Module):
 
         support_set = [torch.eye(node_num).to(supports.device), supports]
 
-        # 计算切比雪夫多项式，添加数值稳定性检查
+
         for k in range(2, self.cheb_k):
             next_support = torch.matmul(2 * supports, support_set[-1]) - support_set[-2]
 
-            # 检查数值稳定性
+
             if torch.isnan(next_support).any() or torch.isinf(next_support).any():
                 print(f"Warning: support {k} contains NaN or Inf values")
                 next_support = torch.nan_to_num(next_support, nan=0.0, posinf=1.0, neginf=-1.0)
@@ -333,7 +326,7 @@ class AVWGCN(nn.Module):
 
         supports = torch.stack(support_set, dim=0)
 
-        # 计算权重和偏置
+
         if self.graph_filter_mode == 'node_adaptive':
             weights = torch.einsum('nd,dkio->nkio', node_embeddings, self.weights_pool)
             bias = torch.matmul(node_embeddings, self.bias_pool)
@@ -341,7 +334,7 @@ class AVWGCN(nn.Module):
             weights = self.weights_shared
             bias = self.bias_shared
 
-        # 检查权重和偏置的数值稳定性
+
         if torch.isnan(weights).any() or torch.isinf(weights).any():
             print("Warning: weights contains NaN or Inf values")
             weights = torch.nan_to_num(weights, nan=0.0, posinf=1.0, neginf=-1.0)
@@ -350,7 +343,7 @@ class AVWGCN(nn.Module):
             print("Warning: bias contains NaN or Inf values")
             bias = torch.nan_to_num(bias, nan=0.0, posinf=1.0, neginf=-1.0)
 
-        # 图卷积操作
+
         x_g = torch.einsum("knm,bmc->bknc", supports, x)
         x_g = x_g.permute(0, 2, 1, 3)
         if self.graph_filter_mode == 'node_adaptive':
@@ -358,7 +351,7 @@ class AVWGCN(nn.Module):
         else:
             x_gconv = torch.einsum('bnki,kio->bno', x_g, weights) + bias
 
-        # 最终数值稳定性检查
+
         if torch.isnan(x_gconv).any() or torch.isinf(x_gconv).any():
             print("Warning: x_gconv contains NaN or Inf values")
             x_gconv = torch.nan_to_num(x_gconv, nan=0.0, posinf=1.0, neginf=-1.0)
@@ -392,13 +385,13 @@ class TemporalTransformerBlock(nn.Module):
         return rearrange(x, '(b n) f c -> b f n c', b=b, n=n)
 
 
-class PoseMamba_HoT(nn.Module):
+class ASGM_Pose(nn.Module):
     def __init__(self, num_frame=9, num_joints=17, in_chans=2, embed_dim_ratio=256, depth=6, mlp_ratio=2.,
                  drop_rate=0., drop_path_rate=0.2, norm_layer=None, token_num=None, layer_index=None,
                  selection_method='dpc', graph_edge_mode='signed', graph_degree_mode='algebraic',
                  graph_filter_mode='node_adaptive', token_ablation_mode='selection_restoration',
                  temporal_block_type='mamba', transformer_num_heads=8):
-        """HoT PoseMamba: Hourglass Tokenizer for Efficient PoseMamba
+        """HoT ASGM-Pose: Hourglass Tokenizer for Efficient ASGM-Pose
         Args:
             num_frame (int): input frame number
             num_joints (int): joints number
@@ -426,7 +419,7 @@ class PoseMamba_HoT(nn.Module):
         embed_dim = embed_dim_ratio
         out_dim = 3
 
-        # HoT parameters
+
         self.token_num = token_num if token_num is not None else num_frame // 3
         self.layer_index = layer_index if layer_index is not None else depth // 2
         self.recover_num = num_frame
@@ -462,14 +455,14 @@ class PoseMamba_HoT(nn.Module):
         self.temporal_block_type = temporal_block_type
         self.transformer_num_heads = int(transformer_num_heads)
 
-        # Token pruning and recovery components
+
         self.pool = nn.AdaptiveAvgPool1d(1)
         if self.enable_selection:
             self.pos_embed_token = nn.Parameter(torch.zeros(1, self.token_num, embed_dim))
         else:
             self.register_parameter('pos_embed_token', None)
 
-        # Cross attention for token recovery
+
         if self.enable_learned_restoration:
             self.x_token = nn.Parameter(torch.zeros(1, self.recover_num, embed_dim))
             self.cross_attention = Cross_Attention(embed_dim, num_heads=8, qkv_bias=True,
@@ -478,7 +471,7 @@ class PoseMamba_HoT(nn.Module):
             self.register_parameter('x_token', None)
             self.cross_attention = None
 
-        # Original PoseMamba components
+
         self.Spatial_patch_to_embedding = nn.Linear(in_chans, embed_dim_ratio)
         self.Spatial_pos_embed = nn.Parameter(torch.zeros(1, num_joints, embed_dim_ratio))
         self.Temporal_pos_embed = nn.Parameter(torch.zeros(1, num_frame, embed_dim))
@@ -497,7 +490,7 @@ class PoseMamba_HoT(nn.Module):
             graph_degree_mode=graph_degree_mode,
             graph_filter_mode=graph_filter_mode,
         )
-        self.spatial_gcn.adj_matrix_saved = None  # disable forward-time file export
+        self.spatial_gcn.adj_matrix_saved = None
 
         if self.temporal_block_type == 'mamba':
             self.TTEblocks = nn.ModuleList([
@@ -531,14 +524,14 @@ class PoseMamba_HoT(nn.Module):
         self.embed_dim_ratio = embed_dim_ratio
 
     def STE_forward(self, x):
-        b, f, n, c = x.shape  # c是原始输入通道
+        b, f, n, c = x.shape
         x = rearrange(x, 'b f n c -> (b f) n c')
 
-        # 首先使用线性层映射，与原始PoseMamba保持一致
-        x = self.Spatial_patch_to_embedding(x)  # (B*F, N, embed_dim_ratio)
 
-        # 然后使用AVWGCN进行空间建模
-        x_gcn = self.spatial_gcn(x, self.node_embeddings)  # (B*F, N, embed_dim_ratio)
+        x = self.Spatial_patch_to_embedding(x)
+
+
+        x_gcn = self.spatial_gcn(x, self.node_embeddings)
 
         x = x_gcn.view(b, f, n, -1)
         x += self.Spatial_pos_embed
@@ -592,7 +585,7 @@ class PoseMamba_HoT(nn.Module):
         selected_indices = None
 
         for i in range(1, self.block_depth):
-            # === HoT Token Pruning ===
+
             if self.enable_selection and i == self.layer_index:
                 selected_indices = self.select_frame_indices(x)
 
@@ -603,9 +596,9 @@ class PoseMamba_HoT(nn.Module):
                 x += self.pos_embed_token
                 x = rearrange(x, '(b n) f c -> b f n c', n=n)
 
-            # Original STE-TTE processing
-            # 此时x已经是高维特征，不需要再次进行空间处理
-            # 直接进行时间处理
+
+
+
             tteblock = self.TTEblocks[i]
             x = tteblock(x)
             x = self.Temporal_norm(x)
@@ -660,14 +653,14 @@ class PoseMamba_HoT(nn.Module):
     def forward(self, x):
         b, f, n, c = x.shape
 
-        # Initial STE and TTE
+
         x = self.STE_forward(x)
         x = self.TTE_foward(x)
 
-        # Main processing with HoT
+
         x, selected_indices = self.ST_foward(x)
 
-        # === HoT Token Recovery ===
+
         if self.enable_learned_restoration:
             x = rearrange(x, 'b f n c -> (b n) f c')
             x_token = repeat(self.x_token, '() f c -> b f c', b=b * n)
@@ -676,134 +669,7 @@ class PoseMamba_HoT(nn.Module):
         else:
             x = self.interpolate_selected_features(x, selected_indices)
 
-        # Output head
+
         x = self.head(x)
         x = x.view(b, f, n, -1)
         return x
-
-    def get_adjacency_matrix(self):
-        """获取模型的邻接矩阵"""
-        if hasattr(self.spatial_gcn, 'adj_matrix_saved'):
-            return self.spatial_gcn.adj_matrix_saved
-        else:
-            print("No adjacency matrix available. Run forward pass first.")
-            return None
-
-    def visualize_adjacency_matrix(self, save_path='adjacency_matrix_heatmap.png'):
-        """可视化邻接矩阵"""
-        adj_matrix = self.get_adjacency_matrix()
-        if adj_matrix is not None:
-            import matplotlib.pyplot as plt
-            import numpy as np
-
-            plt.figure(figsize=(10, 8))
-            plt.imshow(adj_matrix, cmap='viridis', aspect='auto')
-            plt.colorbar(label='Connection Strength')
-            plt.title('Learned Adjacency Matrix')
-            plt.xlabel('Joint Index')
-            plt.ylabel('Joint Index')
-
-            # 添加关节点标签（如果知道的话）
-            joint_names = [
-                'Hip', 'RHip', 'RKnee', 'RFoot', 'LHip', 'LKnee', 'LFoot',
-                'Spine', 'Thorax', 'Neck/Nose', 'Head', 'LShoulder', 'LElbow',
-                'LWrist', 'RShoulder', 'RElbow', 'RWrist'
-            ]
-
-            if len(joint_names) == adj_matrix.shape[0]:
-                plt.xticks(range(len(joint_names)), joint_names, rotation=45, ha='right')
-                plt.yticks(range(len(joint_names)), joint_names)
-
-            plt.tight_layout()
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            plt.show()
-            print(f"Adjacency matrix heatmap saved to '{save_path}'")
-        else:
-            print("No adjacency matrix available for visualization.")
-
-
-if __name__ == "__main__":
-    torch.cuda.set_device(0)
-    model = PoseMamba_HoT(num_frame=243, embed_dim_ratio=128, mlp_ratio=2, depth=10,
-                          token_num=81, layer_index=5).cuda()
-    from thop import profile, clever_format
-
-    input_shape = (1, 243, 17, 2)
-    x = torch.randn(input_shape).cuda()
-
-    print("--- ACCURATE MODEL ANALYSIS ---")
-
-    # --- 2. 准确计算参数量 (Params) ---
-    # 这是最直接、最准确的方法，完全替代thop的参数量计算
-    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"\n[Accurate Params] Total Trainable Parameters: {total_params / 1e6:.3f}M")
-
-    # (可选) 细分各部分的参数量，帮助你理解模型构成
-    gcn_params = sum(p.numel() for p in model.spatial_gcn.parameters() if p.requires_grad)
-    node_emb_params = model.node_embeddings.numel()
-    mamba_blocks_params = sum(p.numel() for p in model.TTEblocks.parameters() if p.requires_grad)
-
-    print(f"    - Spatial GCN (AVWGCN) module: {gcn_params / 1e6:.3f}M")
-    print(f"    - Node Embeddings: {node_emb_params / 1e6:.3f}M")
-    print(f"    - Temporal Blocks (Mamba): {mamba_blocks_params / 1e6:.3f}M")
-    print(
-        f"    - Others (embedding, head, etc.): {(total_params - gcn_params - node_emb_params - mamba_blocks_params) / 1e6:.3f}M")
-
-
-    # --- 3. 计算计算量 (FLOPs) ---
-    # 由于 thop 对 AVWGCN 计算不准，我们需要手动为它“打补丁”
-
-    # 3.1 定义一个函数来手动计算 AVWGCN 的 FLOPs
-
-    def count_avwgcn_flops(module, input_tensor, output_tensor):
-        # input_tensor[0] 是 x, input_tensor[1] 是 node_embeddings
-        x, node_embeddings = input_tensor
-        B_T, N, C = x.shape  # B*F, num_joints, embed_dim
-
-        cheb_k = module.cheb_k
-        embed_dim = node_embeddings.shape[1]
-
-        flops = 0
-
-        # === (这里的FLOPs计算逻辑保持不变) ===
-        # adj_matrix = torch.mm(node_embeddings, node_embeddings.transpose(0, 1))
-        flops += N * N * embed_dim * 2
-
-        # 切比雪夫多项式计算 (k-2次循环)
-        flops += (cheb_k - 2) * (N * N * N * 2)
-
-        # weights = torch.einsum('nd,dkio->nkio', node_embeddings, self.weights_pool)
-        flops += N * embed_dim * cheb_k * C * C * 2
-
-        # x_g = torch.einsum("knm,bmc->bknc", supports, x)
-        # 注意：这里的 B_T, N, C 是基于输入x的维度，einsum操作涉及到的其他维度也需要考虑
-        # 一个更粗略但安全的估算方式是基于输入输出元素数量
-        flops += cheb_k * B_T * N * N * C * 2
-
-        # x_gconv = torch.einsum('bnki,nkio->bno', x_g, weights)
-        flops += B_T * N * cheb_k * C * C * N * 2
-
-        # === 修改在这里 ===
-        # 检查 __flops__ 属性是否存在，如果不存在则初始化为0
-        if not hasattr(module, '__flops__'):
-            module.__flops__ = 0
-
-        # 现在可以安全地进行累加
-        module.__flops__ += int(flops)
-
-
-    # 3.2 使用 thop，但为 AVWGCN 注册我们自定义的计算函数
-    from thop import profile, clever_format
-
-    custom_ops = {AVWGCN: count_avwgcn_flops}
-
-    # 再次运行 profile，这次它会用我们的函数来处理 AVWGCN
-    flops, params = profile(model, inputs=(x,), custom_ops=custom_ops, verbose=False)
-
-    print(f"\n[Accurate FLOPs] Total GFLOPs: {flops / 1e9:.3f}G")
-
-    # 我们可以用 clever_format 来美化输出
-    flops_str, params_str = clever_format([flops, params], "%.3f")
-    print(f"    - (thop with custom op) FLOPs: {flops_str}")
-    print(f"    - (thop with custom op) params: {params_str}")  # thop的参数计算仍然可能不准，以手动为准
-    # 终版
