@@ -1,6 +1,6 @@
 # ASGM-Pose
 
-This repository contains the Human3.6M training and evaluation code for ASGM-Pose. It intentionally includes only the data-preparation, training, and checkpoint-evaluation paths used by this release.
+This repository contains the Human3.6M training and evaluation code for ASGM-Pose.
 
 ## Environment
 
