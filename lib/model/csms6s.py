@@ -174,7 +174,8 @@ class CrossScan_plus_poselimbs(torch.autograd.Function):
         assert W == 17, 'the number of joints is not 17'
         ctx.shape = (B, C, H, W)
         xs = x.new_empty((B, 4, C, H * W))
-        indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        indices = torch.arange(W, device=x.device)
+        ctx.save_for_backward(indices)
         xs[:, 0] = (x + x[..., indices]).flatten(2, 3)
         xs[:, 1] = x.transpose(dim0=2, dim1=3).flatten(2, 3)
         xs[:, 2:4] = torch.flip(xs[:, 0:2], dims=[-1])
@@ -185,9 +186,13 @@ class CrossScan_plus_poselimbs(torch.autograd.Function):
 
         B, C, H, W = ctx.shape
         L = H * W
+        (indices,) = ctx.saved_tensors
         ys = ys[:, 0:2] + ys[:, 2:4].flip(dims=[-1]).view(B, 2, -1, L)
-        y = ys[:, 0] + ys[:, 1].view(B, -1, W, H).transpose(dim0=2, dim1=3).contiguous().view(B, -1, L)
-        return y.view(B, -1, H, W)
+        scan_grad = ys[:, 0].view(B, -1, H, W)
+        indexed_grad = torch.zeros_like(scan_grad)
+        indexed_grad.index_add_(3, indices, scan_grad)
+        temporal_grad = ys[:, 1].view(B, -1, W, H).transpose(dim0=2, dim1=3).contiguous()
+        return scan_grad + indexed_grad + temporal_grad
 
 
 class CrossMerge_plus_poselimbs(torch.autograd.Function):
