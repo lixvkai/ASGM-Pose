@@ -2,7 +2,6 @@
 
 This repository releases the core network implementation of **ASGM-Pose** for monocular 3D human pose estimation. It contains the heterogeneous spatial graph module, temporal state-space blocks, token selection/restoration pathway, and their custom scan operators.
 
-The release intentionally excludes dataset preparation, training, evaluation, configuration files, checkpoints, and demo code.
 
 ## Dependencies
 
