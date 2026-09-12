@@ -1,8 +1,2 @@
-numpy
-PyYAML
-tensorboardX
-tqdm
-easydict
-prettytable
 einops
 triton

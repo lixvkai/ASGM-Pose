@@ -1,71 +1,51 @@
 # ASGM-Pose
 
-This repository contains the Human3.6M training and evaluation code for ASGM-Pose.
+This repository releases the core network implementation of **ASGM-Pose** for monocular 3D human pose estimation. It contains the heterogeneous spatial graph module, temporal state-space blocks, token selection/restoration pathway, and their custom scan operators.
 
-## Environment
+The release intentionally excludes dataset preparation, training, evaluation, configuration files, checkpoints, and demo code.
 
-Create a Python environment and install a PyTorch build compatible with your CUDA driver, then install the remaining dependencies:
+## Dependencies
+
+Use Python 3.10 or later. Install a PyTorch build compatible with the local CUDA environment following the [official PyTorch instructions](https://pytorch.org/get-started/locally/), then install the remaining dependencies:
 
 ```bash
-conda create -n asgm-pose python=3.10
-conda activate asgm-pose
-# Install PyTorch following https://pytorch.org/get-started/locally/
 pip install -r requirements.txt
 ```
 
-## Human3.6M data preparation
+## Model interface
 
-1. Download the MotionBERT-preprocessed Human3.6M file `h36m_sh_conf_cam_source_final.pkl` from the original PoseMamba data release:
-   - [OneDrive](https://1drv.ms/u/s%21AvAdh0LSjEOlgU7BuUZcyafu8kzc?e=vobkjZ)
-   - [Google Drive](https://drive.google.com/file/d/1WWoVAae7YKKKZpa1goO_7YcwVFNR528S/view?usp=sharing)
+From the repository root, instantiate the model as follows:
 
-2. Place the downloaded file under `data/motion3d/`, generate clips, and copy the source file into the runtime data directory:
+```python
+import torch
 
-```bash
-mkdir -p data/motion3d/MB3D_f243s81
-python tools/convert_h36m.py
-cp data/motion3d/h36m_sh_conf_cam_source_final.pkl \
-   data/motion3d/MB3D_f243s81/
+from lib.model.ASGM_Pose import ASGM_Pose
+
+model = ASGM_Pose(
+    num_frame=243,
+    num_joints=17,
+    in_chans=2,
+    embed_dim_ratio=128,
+    depth=10,
+    mlp_ratio=2.0,
+    token_num=81,
+    layer_index=5,
+).cuda().eval()
+
+x = torch.randn(1, 243, 17, 2, device="cuda")
+with torch.no_grad():
+    y = model(x)
 ```
 
-After preparation, `data/motion3d/MB3D_f243s81/` must contain `h36m_sh_conf_cam_source_final.pkl` and `H36M-SH/`. The repository ignores data files by default.
+The input tensor has shape `(B, T, J, C)`, where `B`, `T`, `J`, and `C` denote batch size, temporal length, number of joints, and input channels, respectively. The default input is 2D joint coordinates (`C=2`), and the model outputs 3D joint coordinates with shape `(B, T, J, 3)`.
 
-## Pretrained checkpoints
+## Core files
 
-Download the Human3.6M checkpoint that matches the selected configuration:
-
-| Model | Download |
-| --- | --- |
-| ASGM-Pose-S | [Google Drive](https://drive.google.com/file/d/1P7mAYdCm1euVwCfIALQzL5Khtzanuaml/view?usp=drive_link) |
-| ASGM-Pose-B | [Google Drive](https://drive.google.com/file/d/1hqlb0nukVdj8ZOd0gzMxuKrxU0UA2oR5/view?usp=drive_link) |
-| ASGM-Pose-L | [Google Drive](https://drive.google.com/file/d/1pIsr9_0Bxjc_2HscaTEzdyNcYqdMSdhd/view?usp=drive_link) |
-
-Place the downloaded checkpoint at any local path; the evaluation command accepts the checkpoint path explicitly.
-
-## Training
-
-Train an S, B, or L configuration with a separate output directory:
-
-```bash
-python train.py --config configs/pose3d/ASGM_Pose_h36m_S.yaml --checkpoint checkpoint/ASGM_Pose_S
-python train.py --config configs/pose3d/ASGM_Pose_h36m_B.yaml --checkpoint checkpoint/ASGM_Pose_B
-python train.py --config configs/pose3d/ASGM_Pose_h36m_L.yaml --checkpoint checkpoint/ASGM_Pose_L
-```
-
-Training writes `best_epoch.bin` and `latest_epoch.bin` to the directory supplied by `--checkpoint`.
-
-## Evaluation
-
-Evaluate a trained or downloaded Human3.6M checkpoint as follows:
-
-```bash
-python train.py \
-  --config configs/pose3d/ASGM_Pose_h36m_B.yaml \
-  --evaluate /path/to/best_epoch.bin
-```
-
-Use the configuration that matches the checkpoint scale. This release provides benchmark evaluation from 2D keypoints to 3D poses; it does not include a separate in-the-wild video demo pipeline.
+- `lib/model/ASGM_Pose.py`: ASGM-Pose architecture and adaptive graph convolution.
+- `lib/model/mambablocks.py`: temporal state-space blocks.
+- `lib/model/csms6s.py` and `lib/model/csm_triton.py`: selective-scan operators.
+- `lib/model/drop.py`: stochastic-depth layer.
 
 ## License
 
-This repository is derived from [PoseMamba](https://github.com/nankingjing/PoseMamba) and is distributed under the Apache License 2.0. See [LICENSE](LICENSE). Any redistribution must comply with that license and retain the required notices.
+This repository is derived from [PoseMamba](https://github.com/nankingjing/PoseMamba) and is distributed under the Apache License 2.0. See [LICENSE](LICENSE).
