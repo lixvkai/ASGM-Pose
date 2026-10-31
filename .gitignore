@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+.venv/
+outputs/
+checkpoint*/
+*.bin
+*.pth
+*.pt
+*.npy
+*.npz
+*.pkl
+data/motion3d/
+*.mp4
+*.gif

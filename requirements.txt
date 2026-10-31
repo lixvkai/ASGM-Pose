@@ -1,0 +1,11 @@
+numpy
+PyYAML
+easydict
+tqdm
+prettytable
+einops
+triton
+packaging
+ninja
+wheel
+setuptools
